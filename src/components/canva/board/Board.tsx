@@ -151,14 +151,7 @@ const Board: React.FC = () => {
     window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("wheel", onWheel, { passive: true });
-
-    return () => {
-      canvas.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("wheel", onWheel);
-    };
-  }, [mousePos, offsetX, offsetY, setCells, zoom]);
+  }, []);
 
   return <canvas ref={canvasRef} className="canvas" />;
 };
