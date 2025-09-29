@@ -22,6 +22,13 @@ const Board: React.FC = () => {
   useEffect(() => {
     const canvas = canvasRef.current;
 
+    let isMouseDown = false;
+    let startMouseX = 0;
+    let startMouseY = 0;
+    let startOffsetX = 0;
+    let startOffsetY = 0;
+    const dragThreshold = 5;
+
     if (!canvas) {
       return;
     }
@@ -31,15 +38,87 @@ const Board: React.FC = () => {
       canvas.height = window.innerHeight;
     };
 
+    const onMouseDown = (e: MouseEvent) => {
+      isMouseDown = true;
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      startOffsetX = offsetX.current;
+      startOffsetY = offsetY.current;
+    };
+    
+    const onMouseUp = (e: MouseEvent) => {
+      isMouseDown = false;
+      const dx = e.clientX - startMouseX;
+      const dy = e.clientY - startMouseY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < dragThreshold) {
+        let newCells = new Set(cells);
+        // click
+        const cellSize = 50;
+        const cursorCellX = Math.floor(
+          (e.clientX - offsetX.current) / (cellSize * zoom.current)
+        );
+        const cursorCellY = -Math.floor(
+          (e.clientY - offsetY.current) / (cellSize * zoom.current)
+        );
+        const cell = `${cursorCellX},${cursorCellY}`;
+
+        if (cells.has(cell)) {
+          newCells.delete(cell);
+        } else {
+          newCells.add(cell);
+        }
+        setCells(newCells);
+        console.log(newCells);
+      }
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+      if (isMouseDown) {
+        const dx = e.clientX - startMouseX;
+        const dy = e.clientY - startMouseY;
+
+        offsetX.current = startOffsetX + dx;
+        offsetY.current = startOffsetY + dy;
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      const zoomFactor = 1.1;
+
+      if (e.deltaY < 0) {
+        if (zoom.current < 1) {
+          // Block zooming too close
+          zoom.current *= zoomFactor;
+        }
+      } else {
+        zoom.current /= zoomFactor;
+      }
+    };
+
     handleResize();
+
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mousemove", onMouseMove);
+    canvas.addEventListener("wheel", onWheel, { passive: true });
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+
+    return () => {
+      canvas.removeEventListener("mousedown", onMouseDown);
+      canvas.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("mousemove", onMouseMove);
+      canvas.removeEventListener("wheel", onWheel);
+      window.removeEventListener("resize", handleResize);
+    }
+  }, [cells, setCells, offsetX, offsetY, zoom]);
 
   useEffect(() => {
     let lastDraw = 0;
     let lastCycle = 0;
-    const frameRate = 60;
+    const frameRate = 30;
     const cycleDuration = 50;
     let rafId = 0;
 
@@ -71,87 +150,6 @@ const Board: React.FC = () => {
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
   }, [paused, cells, nextTick, showGrid, mousePos, zoom, offsetX, offsetY]);
-
-  // mouse handling for pan / click / zoom (basic)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
-    let isMouseDown = false;
-    let startMouseX = 0;
-    let startMouseY = 0;
-    let startOffsetX = 0;
-    let startOffsetY = 0;
-    const dragThreshold = 5;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isMouseDown = true;
-      startMouseX = e.clientX;
-      startMouseY = e.clientY;
-      startOffsetX = offsetX.current;
-      startOffsetY = offsetY.current;
-    };
-    
-    const onMouseUp = (e: MouseEvent) => {
-      isMouseDown = false;
-      const dx = (mousePos?.x ?? 0) - startMouseX;
-      const dy = (mousePos?.y ?? 0) - startMouseY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < dragThreshold) {
-        // toggle cell
-        const cellSize = 50;
-        const cursorCellX = Math.floor(
-          ((mousePos?.x ?? 0) - offsetX.current) / (cellSize * zoom.current)
-        );
-        const cursorCellY = -Math.floor(
-          ((mousePos?.y ?? 0) - offsetY.current) / (cellSize * zoom.current)
-        );
-        const cell = `${cursorCellX},${cursorCellY}`;
-
-        setCells((prev) => {
-          const next = new Set(prev);
-
-          if (next.has(cell)) {
-            next.delete(cell);
-          } else {
-            next.add(cell);
-          }
-          return next;
-        });
-      }
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-      if (isMouseDown) {
-        const dx = e.clientX - startMouseX;
-        const dy = e.clientY - startMouseY;
-
-        offsetX.current = startOffsetX + dx;
-        offsetY.current = startOffsetY + dy;
-      }
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      const zoomFactor = 1.1;
-
-      if (e.deltaY < 0) {
-        if (zoom.current < 1) {
-          // Block zooming too close
-          zoom.current *= zoomFactor;
-        }
-      } else {
-        zoom.current /= zoomFactor;
-      }
-    };
-
-    canvas.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("wheel", onWheel, { passive: true });
-  }, []);
 
   return <canvas ref={canvasRef} className="canvas" />;
 };
